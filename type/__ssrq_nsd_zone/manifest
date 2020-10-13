@@ -1,0 +1,61 @@
+#!/bin/sh -e
+#
+# 2020 Dennis Camera (dennis.camera@ssrq-sds-fds.ch)
+#
+# This file is part of cdist.
+#
+# cdist is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cdist is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with cdist. If not, see <http://www.gnu.org/licenses/>.
+#
+
+NSD_GROUP='nsd'
+
+zone_name=${__object_id:?}
+
+state_should=$(cat "${__object:?}/parameter/state")
+
+source=$(cat "${__object:?}/parameter/source")
+if test "${source}" = '-'
+then
+	source="${__object:?}/stdin"
+fi
+
+if test -s "${__object:?}/parameter/zonefile"
+then
+	zonefile_path=$(cat "${__object:?}/parameter/zonefile")
+else
+	# Fallback
+	zonefile_path="/etc/nsd/${zone_name}.zone"
+fi
+
+
+case $state_should
+in
+	(present)
+		onchange_cmd="nsd-checkzone '${zone_name}' '${zonefile_path}' && nsd-control reload '${zone_name}' && nsd-control notify '${zone_name}' || exit 1"
+		;;
+	(absent)
+		onchange_cmd=
+		;;
+	(*)
+		printf 'Invalid --state: %s\n' "${state_should}" >&2
+		exit 1
+		;;
+esac
+
+# NOTE: Manipulate the zone first and only after that modify the zonefile and
+#       update the zone.
+require=${__object_name:?} \
+__file "${zonefile_path}" --state "${state_should}" \
+	--owner root --group "${NSD_GROUP}" --mode 0644 \
+	--source "${source}" --onchange "${onchange_cmd}"

@@ -1,0 +1,84 @@
+#!/bin/sh -e
+#
+# 2020 Dennis Camera (dennis.camera@ssrq-sds-fds.ch)
+#
+# This file is part of cdist.
+#
+# cdist is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cdist is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with cdist. If not, see <http://www.gnu.org/licenses/>.
+#
+
+os=$(cat "${__global:?}/explorer/os")
+
+if grep -q '^__package[_a-z]*/nsd[0-9]*:installed' "${__messages_in:?}"
+then
+	fresh_install=true
+else
+	fresh_install=false
+fi
+
+# Install post-processing
+if $fresh_install
+then
+	# Run `nsd-control-setup` after install
+	echo 'nsd-control-setup'
+
+	# NOTE: The nsd service needs to be restarted if it is running to make
+	#       nsd-control work.
+	# XXX: Should we also start the service when it hasn't been running before?
+	case $(cat "${__global:?}/explorer/init")
+	in
+		(systemd)
+			echo 'systemctl try-restart nsd.service'
+			;;
+		(sysvinit)
+			cat <<-'EOF'
+			if test -x /etc/init.d/nsd && /etc/init.d/nsd status >/dev/null 2>&1
+			then
+			    /etc/init.d/nsd restart
+			fi
+			EOF
+			;;
+		(*openrc*)
+			echo 'rc-service --ifstarted nsd restart'
+			;;
+		(*)
+			echo "Don't know how to restart service with your init. "\
+			     "Restart nsd service manually to make nsd-control work." >&2
+	esac
+
+	# OS-specific processing
+	case $os
+	in
+		(debian|devuan)
+			# Debian does not install a proper config file in /etc/nsd/nsd.conf,
+			# so we copy the example.
+			cat <<-'EOF'
+			if test -r /usr/share/doc/nsd/examples/nsd.conf.gz
+			then
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.gz >/etc/nsd/nsd.conf
+			elif test -r /usr/share/doc/nsd/examples/nsd.conf.sample.gz
+			then
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.sample.gz >/etc/nsd/nsd.conf
+			fi
+			EOF
+			;;
+	esac
+
+	# Config post-processing
+	# Ensure that *.conf files from nsd.conf.d are included
+	cat <<-'EOF'
+	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' /etc/nsd/nsd.conf \
+	    || printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>/etc/nsd/nsd.conf
+	EOF
+fi
