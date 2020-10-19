@@ -1,0 +1,55 @@
+#!/bin/sh -e
+#
+# 2020 Dennis Camera (dennis.camera@ssrq-sds-fds.ch)
+#
+# This file is part of cdist.
+#
+# cdist is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cdist is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with cdist. If not, see <http://www.gnu.org/licenses/>.
+#
+# This explorer checks for supported algorithms on the target.
+# Because nsd does not provide a facility to extract available algorithms, we
+# check with OpenSSL (the crypto backend) directly.
+
+command -v openssl >/dev/null 2>&2 || {
+	echo 'Could not find openssl executable.' >&2
+	exit 1
+}
+
+{
+	if ! openssl list -1 2>&1 | grep -q -F 'invalid command'
+	then
+		# On OpenSSL 1.1.0 and later, use the list command
+		openssl list -1 -digest-algorithms \
+			| sed -e 's/^.* => //' \
+			| tr 'A-Z' 'a-z' \
+			| sort -u
+	else
+		# Trigger "unknown option" (using -help) on old versions to get a usage
+		# message and parse it...
+		openssl dgst -help 2>&1 >/dev/null \
+			| sed -n -e '/algorithm$/{s/\ .*$//;s/^-//;p}'
+	fi
+} \
+| awk '
+# Convert OpenSSL digest names to the hmac-* names used by nsd.
+# The list of nsd supported algorithms is extracted from
+# tsig-openssl.c#tsig_openssl_init()
+
+/^md5$/    { print "hmac-md5" }
+/^sha1$/   { print "hmac-sha1" }
+/^sha224$/ { print "hmac-sha224" }
+/^sha256$/ { print "hmac-sha256" }
+/^sha384$/ { print "hmac-sha384" }
+/^sha512$/ { print "hmac-sha512" }
+'
