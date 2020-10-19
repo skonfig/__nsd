@@ -1,0 +1,5 @@
+allow-notify
+notify
+outgoing-interface
+provide-xfr
+request-xfr

@@ -18,11 +18,13 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
-state_is=$(cat "${__object:?}/explorer/state")
+zone_name=${__object_id:?}
+
+state_is=$(test -s "${__object:?}/explorer/zonestatus" && echo present || echo absent)
+pattern_is=$(awk -F ': ' '$1 == "pattern" { print $2 }' "${__object:?}/explorer/zonestatus")
 
 state_should=$(cat "${__object:?}/parameter/state")
-zone_name=$(cat "${__object:?}/parameter/name")
-zone_pattern=$(cat "${__object:?}/parameter/pattern")
+pattern_should=$(cat "${__object:?}/parameter/pattern")
 
 case $state_should
 in
@@ -37,9 +39,11 @@ in
 			printf "nsd-control changezone '%s' '%s'\n" "${zone_name}" "${pattern_should}"
 		fi
 		;;
+
 	(absent)
 		printf "nsd-control delzone '%s'\n" "${zone_name}"
 		;;
+
 	(*)
 		printf 'Invalid --state: %s\n' "${state_should}" >&2
 		exit 1
