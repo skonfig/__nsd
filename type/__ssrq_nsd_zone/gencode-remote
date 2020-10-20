@@ -18,6 +18,8 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
+quote() { printf "'%s'" "$(echo "$*" | sed -e "s/'/'\\\\''/g")"; }
+
 zone_name=${__object_id:?}
 
 state_is=$(test -s "${__object:?}/explorer/zonestatus" && echo present || echo absent)
@@ -29,19 +31,24 @@ pattern_should=$(cat "${__object:?}/parameter/pattern")
 case $state_should
 in
 	(present)
+		test -n "${pattern_should}" || {
+			echo 'Parameter --pattern is required if --state present.' >&2
+			exit 1
+		}
+
 		if test "${state_is}" = absent
 		then
-			printf "nsd-control addzone '%s' '%s' || exit 1\n" \
-				"${zone_name}" "${pattern_should}"
-			# printf "nsd-control write '%s'\n" "${zone_name}" ???
+			printf "nsd-control addzone %s %s || exit 1\n" \
+				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
 		elif test "${pattern_is}" != "${pattern_should}"
 		then
-			printf "nsd-control changezone '%s' '%s'\n" "${zone_name}" "${pattern_should}"
+			printf "nsd-control changezone %s %s || exit 1\n" \
+				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
 		fi
 		;;
 
 	(absent)
-		printf "nsd-control delzone '%s'\n" "${zone_name}"
+		printf "nsd-control delzone %s\n || exit 1" "$(quote "${zone_name}")"
 		;;
 
 	(*)

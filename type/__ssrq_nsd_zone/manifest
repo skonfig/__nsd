@@ -53,9 +53,12 @@ in
 		;;
 esac
 
-# NOTE: Manipulate the zone first and only after that modify the zonefile and
-#       update the zone.
-require=${__object_name:?} \
-__file "${zonefile_path}" --state "${state_should}" \
-	--owner root --group "${NSD_GROUP}" --mode 0644 \
-	--source "${source}" --onchange "${onchange_cmd}"
+if test -n "${source}"
+then
+	# NOTE: Manipulate the zone first and only after that modify the zonefile
+	#       and update the zone.
+	require=${__object_name:?} \
+	__file "${zonefile_path}" --state "${state_should}" \
+		--owner root --group "${NSD_GROUP}" --mode 0644 \
+		--source "${source}" --onchange "${onchange_cmd}"
+fi
