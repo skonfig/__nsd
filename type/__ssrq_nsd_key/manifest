@@ -18,10 +18,6 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
-b64_encode() {
-	python3 -c 'import base64, sys; sys.stdout.write(base64.b64encode(sys.stdin.buffer.read()).decode())'
-}
-
 CONF_BASE_DIR=/etc/nsd
 NSD_GROUP='nsd'
 NSD_CONF_DIR="${CONF_BASE_DIR}/nsd.conf.d"
@@ -63,19 +59,13 @@ in
 		__directory "${NSD_KEY_DIR}" --state present \
 			--owner root --group "${NSD_GROUP}" --mode 0750
 
-		# Prepare secret
-		if test -s "${__object:?}/parameter/secret"
-		then
-			secret=$(
-				awk 'BEGIN{FS=RS=""}{sub(/\n$/,"");printf "%s",$0}' <"${__object:?}/parameter/secret" \
-				| b64_encode)
-		else
-			echo 'Generation of secrets not yet supported' >&2
+		secret=$(cat "${__object:?}/parameter/secret")
+		test -n "${secret}" || {
+			echo 'Parameter --secret must be set if --state present.' >&2
 			exit 1
-		fi
+		}
 
 		export CDIST_ORDER_DEPENDENCY=true
-
 		# Secret file
 		require=__directory"${NSD_KEY_DIR}" \
 		__file "${NSD_KEY_DIR}/${file_name_slug}.conf" --state "${state_should}" \

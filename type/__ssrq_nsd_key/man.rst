@@ -20,15 +20,30 @@ None.
 OPTIONAL PARAMETERS
 -------------------
 algorithm
-    The algorithm to use.
+    The algorithm to use for the TSIG key.
 
     One of: hmac-md5, hmac-sha1, hmac-sha224, hmac-sha256, hmac-sha384,
     hmac-sha512
+
+    Please note that some options might not be available on some systems.
+
+    This parameter is required if ``--state`` is ``present``.
+    If ``--state`` is ``absent`` this parameter is ignored.
 state
     Whether the TSIG key should be present or absent.
     Either `present` or `absent`, defaults to `present`.
 secret
-    The secret value (not base64 encoded.)
+    The secret value (a base64-encoded binary secret; length must be a multiple
+    of 4.)
+
+    TSIG secrets can be generated e.g. by using BIND's ``tsig-keygen``:
+    .. code-block:: sh
+
+        tsig-keygen -a hmac-sha256 tsig.example.com
+
+    This parameter is required if ``--state`` is ``present``.
+    If ``--state`` is ``absent`` this parameter is ignored.
+
 
 
 BOOLEAN PARAMETERS
@@ -42,10 +57,7 @@ EXAMPLES
 .. code-block:: sh
 
     # store a TSIG key for example.org (as per nsd.conf(5))
-    __ssrq_nsd_key tsig.example.org. --algorithm hmac-md5 --secret aaaaaabbbbbbccccccdddddd
-
-    # Generate and stoer a TSIG key for example.com
-    __ssrq_nsd_key tsig.example.com. --algorithm hmac-md5
+    __ssrq_nsd_key tsig.example.org. --algorithm hmac-sha256 --secret aaaaaabbbbbbccccccdddddd
 
     # Delete a TSIG key
     __ssrq_nsd_key tsig.legacy.com. --state absent
