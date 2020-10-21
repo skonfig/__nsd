@@ -18,6 +18,11 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
+drop_awk_comments() { sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@"; }
+
+CONF_BASE_PATH=/etc/nsd
+nsd_conf="${CONF_BASE_PATH}/nsd.conf"
+
 os=$(cat "${__global:?}/explorer/os")
 
 if grep -q '^__package[_a-z]*/nsd[0-9]*:installed' "${__messages_in:?}"
@@ -78,7 +83,27 @@ then
 	# Config post-processing
 	# Ensure that *.conf files from nsd.conf.d are included
 	cat <<-'EOF'
-	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' /etc/nsd/nsd.conf \
-	    || printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>/etc/nsd/nsd.conf
+	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' '${nsd_conf}' \
+	|| printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>'${nsd_conf}'
 	EOF
+fi
+
+
+# Config
+diff=$(
+	# ...
+)
+
+if test -n "${diff}"
+then
+	cat <<CODE
+awk '$(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk")' '${nsd_conf}' <<'EOF' >'${nsd_conf}.tmp' \
+&& cat '${nsd_conf}.tmp' >'${nsd_conf}'
+${diff}
+EOF
+rm '${nsd_conf}.tmp'
+CODE
+
+	config_updated=true
+	echo 'config updated' >>"${__messages_out:?}"
 fi
