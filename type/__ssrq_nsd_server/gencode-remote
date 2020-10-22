@@ -91,7 +91,66 @@ fi
 
 # Config
 diff=$(
-	# ...
+	# Automatic options (the type guesses the correct value automatically)
+	if test -s "${__global:?}/explorer/cpu_cores"
+	then
+		printf '= server:server-count: %u\n' "$(
+			head -n 1 "${__global:?}/explorer/cpu_cores")"
+	fi
+
+	# Boolean options
+	for _opt in hide-identity hide-version refuse-any
+	do
+		if test -f "${__object:?}/parameter/${_opt}"
+		then
+			printf '= server:%s: yes\n' "${_opt}"
+		else
+			printf '- server:%s:\n' "${_opt}"
+		fi
+	done
+	if test -f "${__object:?}/parameter/no-ipv4"
+	then
+		echo '- server:do-ip4:'
+	else
+		echo '= server:do-ip4: no'
+	fi
+	if test -f "${__object:?}/parameter/no-ipv6"
+	then
+		echo '- server:do-ip6:'
+	else
+		echo '= server:do-ip6: no'
+	fi
+
+	# "Singleton" options
+	if test -f "${__object:?}/parameter/database"
+	then
+		printf '= server:database: "%s"\n' "$(
+			head -n 1 "${__object:?}/parameter/database")"
+	fi
+	if test -f "${__object:?}/parameter/port"
+	then
+		printf '= server:port: %u\n' "$(head -n 1 "${__object:?}/parameter/port")"
+	else
+		printf '- server:port:\n'
+	fi
+	if test -f "${__object:?}/parameter/zonesdir"
+	then
+		printf '= server:zonesdir: %u\n' "$(head -n 1 "${__object:?}/parameter/zonesdir")"
+	else
+		printf '- server:zonesdir:\n'
+	fi
+
+	# Multiple options
+	printf '- server:ip-address:\n'
+	if test -s "${__object:?}/parameter/interface"
+	then
+		while read -r _line
+		do
+			printf '+ server:ip-address: %s\n' "${_line}"
+		done <"${__object:?}/parameter/interface"
+	fi
+
+	# TODO: remote-control section
 )
 
 if test -n "${diff}"
