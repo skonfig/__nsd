@@ -1,6 +1,8 @@
 #!/usr/bin/awk -f
 
-# Usage: awk -f update_nsd_conf.awk /etc/nsd/nsd.conf <diff
+function usage() {
+	print "Usage: awk -f update_nsd_conf.awk /etc/nsd/nsd.conf <diff"
+}
 
 # WARNING: This code assumes a "sane" NSD config file, i.e. it adheres to the
 #          common layout of options (only one option per line)
@@ -19,7 +21,7 @@ function comment_pos(line) {
 }
 
 # NOTE: s starts with option name and colon, returns position of colon
-function is_option(s) { return match(s, /^[a-z0-9-]+:/) ? (RLENGTH - 1) : 0 }
+function option_len(s) { return match(s, /^[a-z0-9-]+:/) ? (RLENGTH - 1) : 0 }
 
 function comment_only_line(line) {
 	# HACK: Accessing RSTART of other function
@@ -28,43 +30,28 @@ function comment_only_line(line) {
 function empty_line(line) { return line ~ /^[ \t]*$/ }
 function option_hint_line(line,    x) {
 	x = comment_pos(line)
-	return x && is_option(substr(line, x))
+	return x && option_len(substr(line, x))
 }
 function get_option(line) {
 	match(line, /[^ \t]/)
 	line = substr(line, RSTART)
-	return substr(line, 1, is_option(line))
+	return substr(line, 1, option_len(line))
 }
 
 function top_level_keyword(line) {
+	# NOTE: Hard-coded list of valid top-level keywords as per nsd.conf(5)
 	if (match(line, /^[ \t]*(server|key|pattern|zone|remote-control|dnstap):/))
 		return substr(line, RSTART, RLENGTH - 1)
 	else
 		return ""
 }
 
-# function is_quoted(value) { return (value ~ /^".*"$/) }
-# function quote(value) { return "\"" value "\"" }
-# function unquote(value) {
-# 	return is_quoted(value) \
-# 		? substr(value, 2, length(value) - 2) \
-# 		: value
-# }
-function in_list(list, val,    idx) {
-	idx = index(list, val)
-	if (!idx)
-		return 0
-	else if (length(list) == length(val))
-		# special case: only one element
-		return idx == 1
-	else if (idx == 1)
-		return substr(list, length(val) + 1, 1) == SUBSEP \
-			|| in_list(substr(list, length(val) + 2), val)
-	else if (idx == (length(list) - length(val) + 1))
-		return substr(list, length(list) - length(val), 1) == SUBSEP
-	else
-		return (substr(list, idx - 1, 1) == SUBSEP && substr(list, idx + length(val), 1) == SUBSEP) \
-			|| in_list(substr(list, idx + length(val) + 2), val)
+function in_list(list, val,    i, parts) {
+	split(list, parts, SUBSEP)
+	for (i = 1; i in parts; ++i)
+		if (length(val) == length(parts[i]) && index(parts[1], val) == 1)
+			return 1
+	return 0
 }
 
 function join(arr, sep,    s) {
@@ -97,7 +84,7 @@ function proc_diff_line(line, conf_set, conf_unset,    op, kwd, opt) {
 		return 1
 
 	# Extract option
-	if (!is_option(line)) return 2
+	if (!option_len(line)) return 2
 	opt = get_option(line)
 	line = substr(line, length(opt) + 2)
 
@@ -140,13 +127,17 @@ function print_rest_for(top_level,    i, k, p, values) {
 BEGIN {
 	FS = "\n"  # disable field splitting
 
-	if (ARGC != 2) exit -1  # incorrect number of arguments
+	if (ARGC != 2) {
+		# incorrect number of arguments
+		usage()
+		exit -1
+	}
 
-	# Loop over file twice
+	# Loop over file twice!
 	ARGV[2] = ARGV[1]
 	ARGC++
 
-	# read the "diff" into the `conf` arrays
+	# Read the "diff" into the `conf_{set,unset}` arrays
 	split("", conf_set)
 	split("", conf_unset)
 	while (getline < "/dev/stdin") {
@@ -158,7 +149,7 @@ BEGIN {
 
 
 NR == FNR {
-	# first pass (collect "statistics")
+	# First pass (collect "positions")
 
 	if (/^[ \t]*#*[ \t]*include:/) {
 		# ignore
@@ -168,18 +159,18 @@ NR == FNR {
 		if (top_level_keyword(hinted_option ":")) {
 			TOP_LEVEL = hinted_option
 		} else {
-			last_occ["#" TOP_LEVEL ":" hinted_option ":"] = FNR
+			last_occ["#" TOP_LEVEL, hinted_option] = FNR
 		}
-		last_occ[TOP_LEVEL ":"] = FNR
+		last_occ[TOP_LEVEL] = FNR
 	} else if (top_level_keyword($0)) {
 		TOP_LEVEL = top_level_keyword($0)
-		last_occ[TOP_LEVEL ":"] = FNR
+		last_occ[TOP_LEVEL] = FNR
 	} else {
 		option = get_option($0)
 
 		if (option) {
-			last_occ[TOP_LEVEL ":" option ":"] = FNR
-			last_occ[TOP_LEVEL ":"] = FNR
+			last_occ[TOP_LEVEL, option] = FNR
+			last_occ[TOP_LEVEL] = FNR
 		}
 	}
 
@@ -190,19 +181,26 @@ NR == FNR {
 # in the second pass.
 NR > FNR && FNR == 1 {
 	# First we drop the locations of commented-out options if a non-commented
-	# option is available. If a non-commented option is available, we will
+	# option is available.
+	# Otherwise, we convert it as if it were the last occurrence of a
+	# non-commented option.
+	# Why? If a non-commented option is available, we will
 	# append new config options there to have them all at one place.
 	for (k in last_occ) {
-		if (k ~ /^#/ && (substr(k, 2) in last_occ))
+		if (k ~ /^#/) {
+			if (!(substr(k, 2) in last_occ)) {
+				last_occ[substr(k, 2)] = last_occ[k]
+			}
 			delete last_occ[k]
+		}
 	}
 
 	# Reverse the option => line mapping. The line_map allows for easier lookups
 	# in the second pass.
-	# We only invert options, not top-level keywords because we can only have
-	# one entry per line and there are likely conflicts with top-level keywords
+	# We only keep options, not top-level keywords, because we can only have
+	# one entry per line and there are conflicts with last lines of "sections".
 	for (k in last_occ) {
-		if (k !~ /^#?.*:.*:$/) continue
+		if (!index(k, SUBSEP)) continue
 		line_map[last_occ[k]] = k
 	}
 }
@@ -253,9 +251,9 @@ NR > FNR && FNR == 1 {
 
 line_map[FNR] {
 	# we have the last occurrence of a (hinted) option here...
-	tok = (line_map[FNR] ~ /^#/ ? substr(line_map[FNR], 2) : line_map[FNR])
-	top_level = get_option(tok)
-	option = get_option(substr(tok, length(top_level) + 2))
+	split(line_map[FNR], parts, SUBSEP)
+	top_level = parts[1]
+	option = parts[2]
 
 	split(conf_set[top_level, option], parts, SUBSEP)
 	for (i = 1; i in parts; ++i)
@@ -264,7 +262,7 @@ line_map[FNR] {
 	delete conf_set[top_level, option]
 }
 
-last_occ[TOP_LEVEL ":"] == FNR {
+last_occ[TOP_LEVEL] == FNR {
 	for (k in conf_set) {
 		if (index(k, TOP_LEVEL SUBSEP) == 1) {
 			# Only inset newline if there is a rest
