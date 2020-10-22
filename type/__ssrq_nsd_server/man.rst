@@ -32,8 +32,16 @@ EXAMPLES
 
 .. code-block:: sh
 
-    # TODO
+    # Install a NSD server with default settings
     __ssrq_nsd_server
+
+
+BUGS
+----
+This type assumes that the main server config is located at
+``/etc/nsd/nsd.conf`` on the target.
+Furthermore, a sanely formatted `nsd.conf` file is assumed, i.e. only one
+configuration option on a single line.
 
 
 SEE ALSO
