@@ -91,10 +91,14 @@ fi
 
 # Config
 diff=$(
+	diff_line() {
+		printf '%s %s: %s\n' "$1" "$2" "$(printf "${3:-%s}" "${4-}")";
+	}
+
 	# Automatic options (the type guesses the correct value automatically)
 	if test -s "${__global:?}/explorer/cpu_cores"
 	then
-		printf '= server:server-count: %u\n' "$(
+		diff_line = server:server-count %u "$(
 			head -n 1 "${__global:?}/explorer/cpu_cores")"
 	fi
 
@@ -103,50 +107,46 @@ diff=$(
 	do
 		if test -f "${__object:?}/parameter/${_opt}"
 		then
-			printf '= server:%s: yes\n' "${_opt}"
+			diff_line = "server:${_opt}" %s yes
 		else
-			printf '- server:%s:\n' "${_opt}"
+			diff_line - "server:${_opt}"
 		fi
 	done
 	if test -f "${__object:?}/parameter/no-ipv4"
 	then
-		echo '- server:do-ip4:'
+		diff_line = server:do-ip4 %s no
 	else
-		echo '= server:do-ip4: no'
+		diff_line - server:do-ip4
 	fi
 	if test -f "${__object:?}/parameter/no-ipv6"
 	then
-		echo '- server:do-ip6:'
+		diff_line = server:do-ip6 %s no
 	else
-		echo '= server:do-ip6: no'
+		diff_line - server:do-ip6
 	fi
 
 	# "Singleton" options
 	if test -f "${__object:?}/parameter/database"
 	then
-		printf '= server:database: "%s"\n' "$(
+		diff_line = server:database '"%s"' "$(
 			head -n 1 "${__object:?}/parameter/database")"
 	fi
 	if test -f "${__object:?}/parameter/port"
 	then
-		printf '= server:port: %u\n' "$(head -n 1 "${__object:?}/parameter/port")"
-	else
-		printf '- server:port:\n'
+		diff_line = server:port %u "$(head -n 1 "${__object:?}/parameter/port")"
 	fi
 	if test -f "${__object:?}/parameter/zonesdir"
 	then
-		printf '= server:zonesdir: %u\n' "$(head -n 1 "${__object:?}/parameter/zonesdir")"
-	else
-		printf '- server:zonesdir:\n'
+		diff_line = server:zonesdir '"%s"' "$(head -n 1 "${__object:?}/parameter/zonesdir")"
 	fi
 
 	# Multiple options
-	printf '- server:ip-address:\n'
+	diff_line - server:ip-address
 	if test -s "${__object:?}/parameter/interface"
 	then
 		while read -r _line
 		do
-			printf '+ server:ip-address: %s\n' "${_line}"
+			diff_line + server:ip-address %s "${_line}"
 		done <"${__object:?}/parameter/interface"
 	fi
 
