@@ -61,9 +61,6 @@ zonesdir
 
 BOOLEAN PARAMETERS
 ------------------
-hide-identity
-    Configure NSD to not answer ``HOSTNAME.BIND`` and ``ID.SERVER`` ``CHAOS``
-    class queries.
 hide-version
     Configure NSD to not answer ``VERSION.BIND`` and ``VERSION.SERVER``
     ``CHAOS`` class queries.

@@ -87,7 +87,7 @@ diff=$(
 		fi
 
 		# Boolean options
-		for _opt in hide-identity hide-version refuse-any
+		for _opt in hide-version refuse-any
 		do
 			diff_line = "server:${_opt}" %s "$(bool_value "${_opt}")"
 		done
