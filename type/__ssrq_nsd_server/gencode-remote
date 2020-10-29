@@ -150,7 +150,28 @@ diff=$(
 		done <"${__object:?}/parameter/interface"
 	fi
 
-	# TODO: remote-control section
+	# remote-control section
+	if test -f "${__object:?}/parameter/no-remote-control"
+	then
+		diff_line = remote-control:control-enable %s no
+	else
+		# required for other nsd types
+		diff_line = remote-control:control-enable %s yes
+
+		diff_line - remote-control:control-interface
+		if test -s "${__object:?}/parameter/rc-interface"
+		then
+			while read -r _line
+			do
+				diff_line + remote-control:control-interface %s "${_line}"
+			done <"${__object:?}/parameter/interface"
+		fi
+		if test -s "${__object:?}/parameter/rc-port"
+		then
+			diff_line = remote-control:control-port %u "$(
+				head -n 1 "${__object:?}/parameter/rc-port")"
+		fi
+	fi
 )
 
 if test -n "${diff}"

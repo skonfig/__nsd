@@ -41,6 +41,16 @@ interface
     For more information, please refer to :strong:`nsd.conf`\ (5).
 port
     The port NSD should answer queries on.
+rc-interface
+    An interface for NSD to listen on for remote control:
+    ``<ip4 or ip6 or filename>``
+
+    Can be used multiple times to bind on multiple interfaces.
+
+    If an absolute path is used, a UNIX local named pipe is created (and key and
+    cert files are not needed, use directory permissions).
+rc-port
+    The port number the remote control service should listen on.
 state
     ``present`` to install NSD, ``absent`` to uninstall.
     Defaults to ``present``.
@@ -63,6 +73,10 @@ no-ipv4
     Do not listen on IPv4 port.
 no-ipv6
     Do not listen on IPv6 port.
+no-remote-control
+    Disable remote control with nsd-control(8) completely.
+
+    NB: Enabling this option will break the other __ssrq_nsd_* types.*
 
 
 EXAMPLES
