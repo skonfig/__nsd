@@ -18,7 +18,7 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
-drop_awk_comments() { sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@"; }
+drop_awk_comments() { quote "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
 quote() { printf "'%s'" "$(printf '%s' "$*" | sed -e "s/'/'\\\\''/g")"; }
 
 CONF_BASE_PATH=/etc/nsd
@@ -174,11 +174,11 @@ diff=$(
 if test -n "${diff}"
 then
 	cat <<CODE
-awk '$(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk")' '${nsd_conf}' <<'EOF' >'${nsd_conf}.tmp' \
-&& nsd-checkconf '${nsd_conf}.tmp' && cat '${nsd_conf}.tmp' >'${nsd_conf}' || exit 1
+awk $(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk") $(quote "${nsd_conf}") <<'EOF' >$(quote "${nsd_conf}.tmp") \
+&& nsd-checkconf $(quote "${nsd_conf}.tmp") && cat $(quote "${nsd_conf}.tmp") >$(quote "${nsd_conf}") || exit 1
 ${diff}
 EOF
-rm -f '${nsd_conf}.tmp'
+rm -f $(quote "${nsd_conf}.tmp")
 CODE
 
 	config_updated=true

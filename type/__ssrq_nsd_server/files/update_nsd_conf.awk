@@ -15,7 +15,7 @@ function usage() {
 #  - TOP_LEVEL:option: value? (remove either option with given value or if value is empty all options)
 
 function comment_pos(line) {
-	# returns the position in line at which the comment'\''s text starts
+	# returns the position in line at which the comment's text starts
 	# (0 if the line is not a comment)
 	return match(line, /[ \t]*\#+[ \t]*/) ? (RSTART + RLENGTH) : 0
 }
