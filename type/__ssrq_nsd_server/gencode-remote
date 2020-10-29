@@ -70,93 +70,104 @@ fi
 # Config
 diff=$(
 	diff_line() {
-		printf '%s %s: %s\n' "$1" "$2" "$(printf "${3:-%s}" "${4-}")";
+		printf '%s %s: %s\n' "$1" "$2" "$(printf "${3:-%s}" "${4-}")"
+	}
+	get_param() { head -n 1 "${__object:?}/parameter/${1:?}"; }
+	bool_value() {
+		test $(case $1 in (no-*) echo '!';; esac) -f "${__object:?}/parameter/${1:?}" \
+			&& echo yes || echo no
 	}
 
-	# Automatic options (the type guesses the correct value automatically)
-	if test -s "${__global:?}/explorer/cpu_cores"
-	then
-		diff_line = server:server-count %u "$(
-			head -n 1 "${__global:?}/explorer/cpu_cores")"
-	fi
-
-	# Boolean options
-	for _opt in hide-identity hide-version refuse-any
-	do
-		if test -f "${__object:?}/parameter/${_opt}"
+	{
+		# Automatic options (the type guesses the correct value automatically)
+		if test -s "${__global:?}/explorer/cpu_cores"
 		then
-			diff_line = "server:${_opt}" %s yes
-		else
-			diff_line - "server:${_opt}"
+			diff_line = server:server-count %u "$(
+				head -n 1 "${__global:?}/explorer/cpu_cores")"
 		fi
-	done
-	if test -f "${__object:?}/parameter/no-ipv4"
-	then
-		diff_line = server:do-ip4 %s no
-	else
-		diff_line - server:do-ip4
-	fi
-	if test -f "${__object:?}/parameter/no-ipv6"
-	then
-		diff_line = server:do-ip6 %s no
-	else
-		diff_line - server:do-ip6
-	fi
 
-	# "Singleton" options
-	if test -f "${__object:?}/parameter/database"
-	then
-		diff_line = server:database '"%s"' "$(
-			head -n 1 "${__object:?}/parameter/database")"
-	fi
-	if test -f "${__object:?}/parameter/port"
-	then
-		diff_line = server:port %u "$(head -n 1 "${__object:?}/parameter/port")"
-	fi
-	if test -f "${__object:?}/parameter/zonesdir"
-	then
-		diff_line = server:zonesdir '"%s"' "$(head -n 1 "${__object:?}/parameter/zonesdir")"
-	fi
-
-	# Multiple options
-	diff_line - server:ip-address
-	if test -s "${__object:?}/parameter/interface"
-	then
-		while read -r _line
+		# Boolean options
+		for _opt in hide-identity hide-version refuse-any
 		do
-			diff_line + server:ip-address %s "${_line}"
-		done <"${__object:?}/parameter/interface"
-	fi
+			diff_line = "server:${_opt}" %s "$(bool_value "${_opt}")"
+		done
+		diff_line = server:do-ip4 %s "$(bool_value no-ipv4)"
+		diff_line = server:do-ip6 %s "$(bool_value no-ipv6)"
 
-	# remote-control section
-	if test -f "${__object:?}/parameter/no-remote-control"
-	then
-		diff_line = remote-control:control-enable %s no
-	else
-		# required for other nsd types
-		diff_line = remote-control:control-enable %s yes
+		# "Singleton" options
+		if test -f "${__object:?}/parameter/database"
+		then
+			diff_line = server:database '"%s"' "$(get_param database)"
+		fi
+		if test -f "${__object:?}/parameter/port"
+		then
+			diff_line = server:port %u "$(get_param port)"
+		fi
+		if test -f "${__object:?}/parameter/zonesdir"
+		then
+			diff_line = server:zonesdir '"%s"' "$(get_param zonesdir)"
+		fi
 
-		diff_line - remote-control:control-interface
-		if test -s "${__object:?}/parameter/rc-interface"
+		# Multiple options
+		diff_line - server:ip-address
+		if test -s "${__object:?}/parameter/interface"
 		then
 			while read -r _line
 			do
-				diff_line + remote-control:control-interface %s "${_line}"
+				diff_line + server:ip-address %s "${_line}"
 			done <"${__object:?}/parameter/interface"
 		fi
-		if test -s "${__object:?}/parameter/rc-port"
+
+		# remote-control section
+		if test -f "${__object:?}/parameter/no-remote-control"
 		then
-			diff_line = remote-control:control-port %u "$(
-				head -n 1 "${__object:?}/parameter/rc-port")"
+			diff_line = remote-control:control-enable %s no
+		else
+			# required for other nsd types
+			diff_line = remote-control:control-enable %s yes
+
+			diff_line - remote-control:control-interface
+			if test -s "${__object:?}/parameter/rc-interface"
+			then
+				while read -r _line
+				do
+					diff_line + remote-control:control-interface %s "${_line}"
+				done <"${__object:?}/parameter/interface"
+			fi
+			if test -s "${__object:?}/parameter/rc-port"
+			then
+				diff_line = remote-control:control-port %u "$(get_param rc-port)"
+			fi
 		fi
-	fi
+	} \
+	| while read -r _op _opt _value
+	  do
+		  case ${_op}
+		  in
+			  (+)
+				  ! grep -qxF "${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+			  (-)
+				  grep -qe "^${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+			  (=)
+				  test "$(grep -ce "^${_opt} " "${__object:?}/explorer/options")" -ne 1 \
+				  || ! grep -qxF "${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+		  esac
+		  printf '%s %s %s\n' "${_op}" "${_opt}" "${_value}"
+	  done
 )
+
 
 if test -n "${diff}"
 then
 	cat <<CODE
 awk '$(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk")' '${nsd_conf}' <<'EOF' >'${nsd_conf}.tmp' \
-&& nsd-checkconf '${nsd_conf}.tmp' && cat '${nsd_conf}.tmp' >'${nsd_conf}'
+&& nsd-checkconf '${nsd_conf}.tmp' && cat '${nsd_conf}.tmp' >'${nsd_conf}' || exit 1
 ${diff}
 EOF
 rm -f '${nsd_conf}.tmp'
