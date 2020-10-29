@@ -19,6 +19,7 @@
 #
 
 drop_awk_comments() { sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@"; }
+quote() { printf "'%s'" "$(printf '%s' "$*" | sed -e "s/'/'\\\\''/g")"; }
 
 CONF_BASE_PATH=/etc/nsd
 nsd_conf="${CONF_BASE_PATH}/nsd.conf"
@@ -64,6 +65,13 @@ then
 	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' '${nsd_conf}' \
 	|| printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>'${nsd_conf}'
 	EOF
+fi
+
+if test -s "${__object:?}/parameter/zonesdir"
+then
+	printf "test -d %s || { echo \"%s\" >&2; exit 1; }\n" \
+		"$(quote "$(head -n 1 "${__object:?}/parameter/zonesdir")")" \
+		'zonesdir does not exist on the target!'
 fi
 
 
