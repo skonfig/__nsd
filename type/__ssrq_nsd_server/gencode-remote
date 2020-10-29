@@ -33,37 +33,10 @@ else
 fi
 
 # Install post-processing
-if $fresh_install
+if ${fresh_install}
 then
-	# Run `nsd-control-setup` after install
-	echo 'nsd-control-setup'
-
-	# NOTE: The nsd service needs to be restarted if it is running to make
-	#       nsd-control work.
-	# XXX: Should we also start the service when it hasn't been running before?
-	case $(cat "${__global:?}/explorer/init")
-	in
-		(systemd)
-			echo 'systemctl try-restart nsd.service'
-			;;
-		(sysvinit)
-			cat <<-'EOF'
-			if test -x /etc/init.d/nsd && /etc/init.d/nsd status >/dev/null 2>&1
-			then
-			    /etc/init.d/nsd restart
-			fi
-			EOF
-			;;
-		(*openrc*)
-			echo 'rc-service --ifstarted nsd restart'
-			;;
-		(*)
-			echo "Don't know how to restart service with your init. "\
-			     "Restart nsd service manually to make nsd-control work." >&2
-	esac
-
 	# OS-specific processing
-	case $os
+	case ${os}
 	in
 		(debian|devuan)
 			# Debian does not install a proper config file in /etc/nsd/nsd.conf,
@@ -79,6 +52,11 @@ then
 			EOF
 			;;
 	esac
+
+	# Run `nsd-control-setup` after install to generate a key pair for
+	# nsd-control. Even if remote control is disabled, having the key pair does
+	# not hurt.
+	echo 'nsd-control-setup'
 
 	# Config post-processing
 	# Ensure that *.conf files from nsd.conf.d are included
@@ -178,12 +156,39 @@ if test -n "${diff}"
 then
 	cat <<CODE
 awk '$(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk")' '${nsd_conf}' <<'EOF' >'${nsd_conf}.tmp' \
-&& cat '${nsd_conf}.tmp' >'${nsd_conf}'
+&& nsd-checkconf '${nsd_conf}.tmp' && cat '${nsd_conf}.tmp' >'${nsd_conf}'
 ${diff}
 EOF
-rm '${nsd_conf}.tmp'
+rm -f '${nsd_conf}.tmp'
 CODE
 
 	config_updated=true
 	echo 'config updated' >>"${__messages_out:?}"
+fi
+
+if ${fresh_install} || ${config_updated:-false}
+then
+	# NOTE: The nsd service needs to be restarted after running
+	#       nsd-control-setup if it is running to make nsd-control work.
+	# NOTE: We try to restart NSD only if it has been running before.
+	case $(cat "${__global:?}/explorer/init")
+	in
+		(systemd)
+			echo 'systemctl try-restart nsd.service'
+			;;
+		(sysvinit)
+			cat <<-'EOF'
+			if test -x /etc/init.d/nsd && /etc/init.d/nsd status >/dev/null 2>&1
+			then
+			    /etc/init.d/nsd restart
+			fi
+			EOF
+			;;
+		(*openrc*)
+			echo 'rc-service --ifstarted nsd restart'
+			;;
+		(*)
+			echo "Don't know how to restart service with your init. "\
+			     "Restart nsd service manually to make nsd-control work." >&2
+	esac
 fi
