@@ -130,7 +130,7 @@ BEGIN {
 	if (ARGC != 2) {
 		# incorrect number of arguments
 		usage()
-		exit -1
+		exit (e=1)
 	}
 
 	# Loop over file twice!
@@ -143,7 +143,7 @@ BEGIN {
 	while (getline < "/dev/stdin") {
 		if (empty_line($0)) continue  # ignore empty lines
 		if (proc_diff_line($0, conf_set, conf_unset))
-			exit 1
+			exit (e=1)
 	}
 }
 
@@ -274,6 +274,8 @@ last_occ[TOP_LEVEL] == FNR {
 }
 
 END {
+	if (e) exit
+
 	# Print the rest for which no "section" could be found in the input file
 	for (k in conf_set) {
 		split(k, parts, SUBSEP)
