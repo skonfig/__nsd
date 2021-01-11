@@ -40,7 +40,7 @@ test -n "${file_name_slug}" || {
 __directory "${CONF_BASE_DIR}" --state pre-exists
 export require=__directory"${CONF_BASE_DIR}"
 
-case $state_should
+case ${state_should}
 in
 	(present)
 		__directory "${NSD_CONF_DIR}" --state present \

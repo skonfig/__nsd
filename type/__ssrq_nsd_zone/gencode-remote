@@ -28,7 +28,7 @@ pattern_is=$(awk -F ': ' '$1 == "pattern" { print $2 }' "${__object:?}/explorer/
 state_should=$(cat "${__object:?}/parameter/state")
 pattern_should=$(cat "${__object:?}/parameter/pattern")
 
-case $state_should
+case ${state_should}
 in
 	(present)
 		test -n "${pattern_should}" || {

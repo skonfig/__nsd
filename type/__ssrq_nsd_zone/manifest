@@ -39,7 +39,7 @@ else
 fi
 
 
-case $state_should
+case ${state_should}
 in
 	(present)
 		onchange_cmd="nsd-checkzone '${zone_name}' '${zonefile_path}' && nsd-control reload '${zone_name}' && nsd-control notify '${zone_name}' || exit 1"

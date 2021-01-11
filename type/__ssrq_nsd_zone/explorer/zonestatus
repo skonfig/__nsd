@@ -22,13 +22,13 @@
 zone_name=${__object_id:?}
 
 nsd-control status >/dev/null 2>&1 || {
-	echo 'nsd-control is required' >&2
+	echo 'error: nsd-control is not functional!' >&2
 	exit 1
 }
 
 
 # NOTE: Process the zonestatus in two steps, because nsd-control prints error
 #       messages on stdout.
-zonestatus=$(nsd-control zonestatus "${__object_id:?}") || exit 0
+zonestatus=$(nsd-control zonestatus "${zone_name}") || exit 0
 
 echo "${zonestatus}" | sed -e 's/^[[:blank:]]*//' -e 's/:[[:blank:]]*/: /'

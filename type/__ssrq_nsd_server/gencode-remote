@@ -78,11 +78,12 @@ fi
 # Config
 diff=$(
 	diff_line() {
+		# shellcheck disable=SC2059
 		printf '%s %s: %s\n' "$1" "$2" "$(printf "${3:-%s}" "${4-}")"
 	}
 	get_param() { head -n 1 "${__object:?}/parameter/${1:?}"; }
 	bool_value() {
-		test $(case $1 in (no-*) echo '!';; esac) -f "${__object:?}/parameter/${1:?}" \
+		test "$(case $1 in (no-*) echo '!';; esac)" -f "${__object:?}/parameter/${1:?}" \
 			&& echo yes || echo no
 	}
 
@@ -90,30 +91,30 @@ diff=$(
 		# Automatic options (the type guesses the correct value automatically)
 		if test -s "${__global:?}/explorer/cpu_cores"
 		then
-			diff_line = server:server-count %u "$(
+			diff_line '=' server:server-count %u "$(
 				head -n 1 "${__global:?}/explorer/cpu_cores")"
 		fi
 
 		# Boolean options
 		for _opt in hide-version refuse-any
 		do
-			diff_line = "server:${_opt}" %s "$(bool_value "${_opt}")"
+			diff_line '=' "server:${_opt}" %s "$(bool_value "${_opt}")"
 		done
-		diff_line = server:do-ip4 %s "$(bool_value no-ipv4)"
-		diff_line = server:do-ip6 %s "$(bool_value no-ipv6)"
+		diff_line '=' server:do-ip4 %s "$(bool_value no-ipv4)"
+		diff_line '=' server:do-ip6 %s "$(bool_value no-ipv6)"
 
 		# "Singleton" options
 		if test -f "${__object:?}/parameter/database"
 		then
-			diff_line = server:database '"%s"' "$(get_param database)"
+			diff_line '=' server:database '"%s"' "$(get_param database)"
 		fi
 		if test -f "${__object:?}/parameter/port"
 		then
-			diff_line = server:port %u "$(get_param port)"
+			diff_line '=' server:port %u "$(get_param port)"
 		fi
 		if test -f "${__object:?}/parameter/zonesdir"
 		then
-			diff_line = server:zonesdir '"%s"' "$(get_param zonesdir)"
+			diff_line '=' server:zonesdir '"%s"' "$(get_param zonesdir)"
 		fi
 
 		# Multiple options
@@ -129,10 +130,10 @@ diff=$(
 		# remote-control section
 		if test -f "${__object:?}/parameter/no-remote-control"
 		then
-			diff_line = remote-control:control-enable %s no
+			diff_line '=' remote-control:control-enable %s no
 		else
 			# required for other nsd types
-			diff_line = remote-control:control-enable %s yes
+			diff_line '=' remote-control:control-enable %s yes
 
 			diff_line - remote-control:control-interface
 			if test -s "${__object:?}/parameter/rc-interface"
@@ -144,7 +145,7 @@ diff=$(
 			fi
 			if test -s "${__object:?}/parameter/rc-port"
 			then
-				diff_line = remote-control:control-port %u "$(get_param rc-port)"
+				diff_line '=' remote-control:control-port %u "$(get_param rc-port)"
 			fi
 		fi
 	} \

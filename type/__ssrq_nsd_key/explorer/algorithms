@@ -32,7 +32,7 @@ command -v openssl >/dev/null 2>&2 || {
 		# On OpenSSL 1.1.0 and later, use the list command
 		openssl list -1 -digest-algorithms \
 			| sed -e 's/^.* => //' \
-			| tr 'A-Z' 'a-z' \
+			| tr '[:upper:]' '[:lower:]' \
 			| sort -u
 	else
 		# Trigger "unknown option" (using -help) on old versions to get a usage

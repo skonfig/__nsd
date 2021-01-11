@@ -20,18 +20,18 @@
 
 
 CONF_BASE_DIR='/etc/nsd'
-NSD_GROUP='nsd'
 
 os=$(cat "${__global:?}/explorer/os")
 state_should=$(cat "${__object:?}/parameter/state")
 
-case $os
+case ${os}
 in
 	(debian|devuan)
 		package_name=nsd
 		;;
 	(*)
-		printf "Your operating system (%s) is currently not supported by this type (%s)\n" "$os" "${__type##*/}" >&2
+		: "${__type:?}"  # make shellcheck happy
+		printf "Your operating system (%s) is currently not supported by this type (%s)\n" "${os}" "${__type##*/}" >&2
 		printf "Please contribute an implementation for it if you can.\n" >&2
 		exit 1
 		;;
