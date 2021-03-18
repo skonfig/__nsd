@@ -18,20 +18,25 @@
 # along with cdist. If not, see <http://www.gnu.org/licenses/>.
 #
 
+CONF_BASE_DIR=/etc/nsd
+NSD_CONF_DIR="${CONF_BASE_DIR}/nsd.conf.d"
+NSD_KEY_DIR="${CONF_BASE_DIR}/nsd.key.d"
+
 breify() {
 	# Convert arguments to a BRE-compatible form, i.e. escape special characters
 	echo "$*" | sed -e 's/[].^$*\[]/\\&/g'
 }
 
-CONF_BASE_DIR=/etc/nsd
-NSD_CONF_DIR="${CONF_BASE_DIR}/nsd.conf.d"
-NSD_KEY_DIR="${CONF_BASE_DIR}/nsd.key.d"
+key_name=${__object_id:?}
+
+# Generate slug to be used in file names (must be in sync with manifest)
+file_name_slug=$(printf '%s' "${key_name}" | tr -c 'A-Za-z0-9-.' '_' | sed 's/\.$//')
 
 
 # NOTE: Due to the broken dependency-resolver in cdist, we need to reconfig nsd
 #       here in gencode-remote and cannot use e.g. __check_messages.
-if grep -q "^__file/$(breify "${NSD_CONF_DIR}"):" "${__messages_in:?}" \
-|| grep -q "^__file/$(breify "${NSD_KEY_DIR}"):" "${__messages_in:?}"
+if grep -q "^__file$(breify "${NSD_CONF_DIR}/${file_name_slug}.key.conf"):" "${__messages_in:?}" \
+|| grep -q "^__file$(breify "${NSD_KEY_DIR}/${file_name_slug}.conf"):" "${__messages_in:?}"
 then
 	echo "nsd-checkconf '${CONF_BASE_DIR}/nsd.conf' && nsd-control reconfig || exit 1"
 fi
