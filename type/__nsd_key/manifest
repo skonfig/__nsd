@@ -1,0 +1,99 @@
+#!/bin/sh -e
+#
+# 2020-2021 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+#
+# This file is part of the skonfig set __nsd.
+#
+# This set is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This set is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this set. If not, see <http://www.gnu.org/licenses/>.
+#
+
+CONF_BASE_DIR=/etc/nsd
+NSD_GROUP='nsd'
+NSD_CONF_DIR="${CONF_BASE_DIR}/nsd.conf.d"
+NSD_KEY_DIR="${CONF_BASE_DIR}/nsd.key.d"
+
+key_name=${__object_id:?}
+
+state_should=$(cat "${__object:?}/parameter/state")
+
+# Generate slug to be used in file names (must be in sync with gencode-remote )
+file_name_slug=$(printf '%s' "${key_name}" | tr -c 'A-Za-z0-9-.' '_' | sed 's/\.$//')
+
+test -n "${file_name_slug}" || {
+	printf 'Slug generation failed for: %s\n' "${key_name}" >&2
+	test -n "${key_name}" || printf 'Make sure the key\047s name is non-empty.\n' >&2
+	exit 1
+}
+
+
+__directory "${CONF_BASE_DIR}" --state pre-exists
+export require=__directory"${CONF_BASE_DIR}"
+
+case ${state_should}
+in
+	(present)
+		__directory "${NSD_CONF_DIR}" --state present \
+			--owner 0 --group 0 --mode 0755
+		__directory "${NSD_KEY_DIR}" --state present \
+			--owner 0 --group "${NSD_GROUP}" --mode 0750
+
+		secret=$(cat "${__object:?}/parameter/secret" 2>/dev/null)
+		test -n "${secret}" || {
+			echo 'Parameter --secret is required if --state present.' >&2
+			exit 1
+		}
+
+		algorithm=$(cat "${__object:?}/parameter/algorithm" 2>/dev/null)
+		test -n "${algorithm}" || {
+			echo 'Parameter --algorithm is required if --state present.' >&2
+			exit 1
+		}
+
+		# Check if the given algorithm is a supported one.
+		grep -qxF "${algorithm}" <"${__object:?}/explorer/algorithms" || {
+			printf 'Unsupported or invalid --algorithm: %s\n' "${algorithm}" >&2
+			printf 'Target explorer reports the following supported algorithms:\n%s\n' \
+				"$(sed 's/^/ - /' "${__object:?}/explorer/algorithms")" >&2
+			exit 1
+		}
+
+
+		# Secret file
+		require="__directory${NSD_KEY_DIR}" \
+		__file "${NSD_KEY_DIR}/${file_name_slug}.conf" --state "${state_should}" \
+			--owner 0 --group "${NSD_GROUP}" --mode 0640 --source - <<EOF
+secret: "${secret}"
+EOF
+
+		# Config file
+		require="__directory${NSD_CONF_DIR} __file${NSD_KEY_DIR}/${file_name_slug}.conf" \
+		__file "${NSD_CONF_DIR}/${file_name_slug}.key.conf" --state "${state_should}" \
+			--owner 0 --group "${NSD_GROUP}" --mode 0644 --source - <<EOF
+key:
+	name: "${key_name}"
+	algorithm: ${algorithm}
+	include: "${NSD_KEY_DIR}/${file_name_slug}.conf"
+EOF
+		;;
+
+	(absent)
+		__file "${NSD_CONF_DIR}/${file_name_slug}.key.conf" --state absent
+		require="__file${NSD_CONF_DIR}/${file_name_slug}.key.conf" \
+		__file "${NSD_KEY_DIR}/${file_name_slug}.conf" --state absent
+		;;
+
+	(*)
+		printf 'Invalid --state: %s\n' "${state_should}" >&2
+		exit 1
+esac

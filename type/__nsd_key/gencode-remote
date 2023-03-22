@@ -1,0 +1,42 @@
+#!/bin/sh -e
+#
+# 2020-2021 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+#
+# This file is part of the skonfig set __nsd.
+#
+# This set is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This set is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this set. If not, see <http://www.gnu.org/licenses/>.
+#
+
+CONF_BASE_DIR=/etc/nsd
+NSD_CONF_DIR="${CONF_BASE_DIR}/nsd.conf.d"
+NSD_KEY_DIR="${CONF_BASE_DIR}/nsd.key.d"
+
+breify() {
+	# Convert arguments to a BRE-compatible form, i.e. escape special characters
+	echo "$*" | sed -e 's/[].^$*\[]/\\&/g'
+}
+
+key_name=${__object_id:?}
+
+# Generate slug to be used in file names (must be in sync with manifest)
+file_name_slug=$(printf '%s' "${key_name}" | tr -c 'A-Za-z0-9-.' '_' | sed 's/\.$//')
+
+
+# NOTE: Due to the broken dependency-resolver in cdist, we need to reconfig nsd
+#       here in gencode-remote and cannot use e.g. __check_messages.
+if grep -q "^__file$(breify "${NSD_CONF_DIR}/${file_name_slug}.key.conf"):" "${__messages_in:?}" \
+|| grep -q "^__file$(breify "${NSD_KEY_DIR}/${file_name_slug}.conf"):" "${__messages_in:?}"
+then
+	echo "nsd-checkconf '${CONF_BASE_DIR}/nsd.conf' && nsd-control reconfig || exit 1"
+fi

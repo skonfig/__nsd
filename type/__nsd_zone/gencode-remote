@@ -1,0 +1,58 @@
+#!/bin/sh -e
+#
+# 2020 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+#
+# This file is part of the skonfig set __nsd.
+#
+# This set is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This set is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this set. If not, see <http://www.gnu.org/licenses/>.
+#
+
+quote() { printf "'%s'" "$(echo "$*" | sed -e "s/'/'\\\\''/g")"; }
+
+zone_name=${__object_id:?}
+
+state_is=$(test -s "${__object:?}/explorer/zonestatus" && echo present || echo absent)
+pattern_is=$(awk -F ': ' '$1 == "pattern" { print $2 }' "${__object:?}/explorer/zonestatus")
+
+state_should=$(cat "${__object:?}/parameter/state")
+pattern_should=$(cat "${__object:?}/parameter/pattern")
+
+case ${state_should}
+in
+	(present)
+		test -n "${pattern_should}" || {
+			echo 'Parameter --pattern is required if --state present.' >&2
+			exit 1
+		}
+
+		if test "${state_is}" = absent
+		then
+			printf "nsd-control addzone %s %s || exit 1\n" \
+				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
+		elif test "${pattern_is}" != "${pattern_should}"
+		then
+			printf "nsd-control changezone %s %s || exit 1\n" \
+				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
+		fi
+		;;
+
+	(absent)
+		printf "nsd-control delzone %s\n || exit 1" "$(quote "${zone_name}")"
+		;;
+
+	(*)
+		printf 'Invalid --state: %s\n' "${state_should}" >&2
+		exit 1
+		;;
+esac

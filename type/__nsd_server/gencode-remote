@@ -1,0 +1,214 @@
+#!/bin/sh -e
+#
+# 2020 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+#
+# This file is part of the skonfig set __nsd.
+#
+# This set is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This set is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this set. If not, see <http://www.gnu.org/licenses/>.
+#
+
+drop_awk_comments() { quote "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
+quote() { printf "'%s'" "$(printf '%s' "$*" | sed -e "s/'/'\\\\''/g")"; }
+
+CONF_BASE_PATH=/etc/nsd
+nsd_conf="${CONF_BASE_PATH}/nsd.conf"
+
+os=$(cat "${__global:?}/explorer/os")
+
+if grep -q '^__package[_a-z]*/nsd[0-9]*:installed' "${__messages_in:?}"
+then
+	fresh_install=true
+else
+	fresh_install=false
+fi
+
+# Install post-processing
+if ${fresh_install}
+then
+	# OS-specific processing
+	case ${os}
+	in
+		(debian|devuan)
+			# Debian does not install a proper config file in /etc/nsd/nsd.conf,
+			# so we copy the example.
+			cat <<-'EOF'
+			if test -r /usr/share/doc/nsd/examples/nsd.conf.gz
+			then
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.gz >/etc/nsd/nsd.conf
+			elif test -r /usr/share/doc/nsd/examples/nsd.conf.sample.gz
+			then
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.sample.gz >/etc/nsd/nsd.conf
+			fi
+			EOF
+			;;
+	esac
+
+	# Run `nsd-control-setup` after install to generate a key pair for
+	# nsd-control. Even if remote control is disabled, having the key pair does
+	# not hurt.
+	echo 'nsd-control-setup'
+
+	# Config post-processing
+	# Ensure that *.conf files from nsd.conf.d are included
+	cat <<-'EOF'
+	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' '${nsd_conf}' \
+	|| printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>'${nsd_conf}'
+	EOF
+fi
+
+if test -s "${__object:?}/parameter/zonesdir"
+then
+	printf "test -d %s || { echo \"%s\" >&2; exit 1; }\n" \
+		"$(quote "$(head -n 1 "${__object:?}/parameter/zonesdir")")" \
+		'zonesdir does not exist on the target!'
+fi
+
+
+# Config
+diff=$(
+	diff_line() {
+		# shellcheck disable=SC2059
+		printf '%s %s: %s\n' "$1" "$2" "$(printf "${3:-%s}" "${4-}")"
+	}
+	get_param() { head -n 1 "${__object:?}/parameter/${1:?}"; }
+	bool_value() {
+		test "$(case $1 in (no-*) echo '!';; esac)" -f "${__object:?}/parameter/${1:?}" \
+			&& echo yes || echo no
+	}
+
+	{
+		# Automatic options (the type guesses the correct value automatically)
+		if test -s "${__global:?}/explorer/cpu_cores"
+		then
+			diff_line '=' server:server-count %u "$(
+				head -n 1 "${__global:?}/explorer/cpu_cores")"
+		fi
+
+		# Boolean options
+		for _opt in hide-version refuse-any
+		do
+			diff_line '=' "server:${_opt}" %s "$(bool_value "${_opt}")"
+		done
+		diff_line '=' server:do-ip4 %s "$(bool_value no-ipv4)"
+		diff_line '=' server:do-ip6 %s "$(bool_value no-ipv6)"
+
+		# "Singleton" options
+		if test -f "${__object:?}/parameter/database"
+		then
+			diff_line '=' server:database '"%s"' "$(get_param database)"
+		fi
+		if test -f "${__object:?}/parameter/port"
+		then
+			diff_line '=' server:port %u "$(get_param port)"
+		fi
+		if test -f "${__object:?}/parameter/zonesdir"
+		then
+			diff_line '=' server:zonesdir '"%s"' "$(get_param zonesdir)"
+		fi
+
+		# Multiple options
+		diff_line - server:ip-address
+		if test -s "${__object:?}/parameter/interface"
+		then
+			while read -r _line
+			do
+				diff_line + server:ip-address %s "${_line}"
+			done <"${__object:?}/parameter/interface"
+		fi
+
+		# remote-control section
+		if test -f "${__object:?}/parameter/no-remote-control"
+		then
+			diff_line '=' remote-control:control-enable %s no
+		else
+			# required for other nsd types
+			diff_line '=' remote-control:control-enable %s yes
+
+			diff_line - remote-control:control-interface
+			if test -s "${__object:?}/parameter/rc-interface"
+			then
+				while read -r _line
+				do
+					diff_line + remote-control:control-interface %s "${_line}"
+				done <"${__object:?}/parameter/interface"
+			fi
+			if test -s "${__object:?}/parameter/rc-port"
+			then
+				diff_line '=' remote-control:control-port %u "$(get_param rc-port)"
+			fi
+		fi
+	} \
+	| while read -r _op _opt _value
+	  do
+		  case ${_op}
+		  in
+			  (+)
+				  ! grep -qxF "${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+			  (-)
+				  grep -qe "^${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+			  (=)
+				  test "$(grep -ce "^${_opt} " "${__object:?}/explorer/options")" -ne 1 \
+				  || ! grep -qxF "${_opt} ${_value}" "${__object:?}/explorer/options" \
+				  || continue
+				  ;;
+		  esac
+		  printf '%s %s %s\n' "${_op}" "${_opt}" "${_value}"
+	  done
+)
+
+
+if test -n "${diff}"
+then
+	cat <<CODE
+awk $(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk") $(quote "${nsd_conf}") <<'EOF' >$(quote "${nsd_conf}.tmp") \
+&& nsd-checkconf $(quote "${nsd_conf}.tmp") && cat $(quote "${nsd_conf}.tmp") >$(quote "${nsd_conf}") || exit 1
+${diff}
+EOF
+rm -f $(quote "${nsd_conf}.tmp")
+CODE
+
+	config_updated=true
+	echo 'config updated' >>"${__messages_out:?}"
+fi
+
+if ${fresh_install} || ${config_updated:-false}
+then
+	# NOTE: The nsd service needs to be restarted after running
+	#       nsd-control-setup if it is running to make nsd-control work.
+	# NOTE: We try to restart NSD only if it has been running before.
+	case $(cat "${__global:?}/explorer/init")
+	in
+		(systemd)
+			echo 'systemctl try-restart nsd.service'
+			;;
+		(sysvinit)
+			cat <<-'EOF'
+			if test -x /etc/init.d/nsd && /etc/init.d/nsd status >/dev/null 2>&1
+			then
+			    /etc/init.d/nsd restart
+			fi
+			EOF
+			;;
+		(*openrc*)
+			echo 'rc-service --ifstarted nsd restart'
+			;;
+		(*)
+			echo "Don't know how to restart service with your init. "\
+			     "Restart nsd service manually to make nsd-control work." >&2
+	esac
+fi
