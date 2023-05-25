@@ -9,7 +9,7 @@ cdist-type__nsd_server - Install and manage configuration of an NSD server
 DESCRIPTION
 -----------
 
-This type can be used to install the NSD server daemon and manage it's server
+This type can be used to install the NSD server daemon and manage its server
 configuration (in ``/etc/nsd/nsd.conf`` that is).
 
 Distribution default values will be kept in the config file, unless a parameter
