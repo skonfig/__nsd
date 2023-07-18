@@ -4,8 +4,9 @@ function usage() {
 	print "Usage: awk -f update_nsd_conf.awk /etc/nsd/nsd.conf <diff"
 }
 
-# WARNING: This code assumes a "sane" NSD config file, i.e. it adheres to the
-#          common layout of options (only one option per line)
+# WARNING: This code assumes a "sane" NSD config file, i.e. it adheres to
+#          the common layout of options (only one option per line)
+#          This code also does not work with "named" sections.
 
 # This script reads a "diff" specification on stdin.
 # It is of the form:
@@ -33,8 +34,7 @@ function option_hint_line(line,    x) {
 	return x && option_len(substr(line, x))
 }
 function get_option(line) {
-	match(line, /[^ \t]/)
-	line = substr(line, RSTART)
+	sub(/^[ \t]*/, "", line)
 	return substr(line, 1, option_len(line))
 }
 
@@ -158,7 +158,7 @@ NR == FNR {
 		hinted_option = get_option(substr($0, comment_pos($0)))
 
 		if (top_level_keyword(hinted_option ":")) {
-			TOP_LEVEL = hinted_option
+			TOP_LEVEL = "#" hinted_option
 		} else {
 			last_occ["#" TOP_LEVEL, hinted_option] = FNR
 		}
@@ -187,8 +187,18 @@ NR > FNR && FNR == 1 {
 	# non-commented option.
 	# Why? If a non-commented option is available, we will
 	# append new config options there to have them all at one place.
+
+	# "double commented options" are commented options in a commented top-level,
+	# they are thus only used if nothing else is available.
 	for (k in last_occ) {
-		if (k ~ /^#/) {
+		if (k ~ /^##/) {
+			if (!(substr(k, 2) in last_occ)) {
+				last_occ[substr(k, 2)] = last_occ[k]
+			}
+			delete last_occ[k]
+			k = substr(k, 2)
+		}
+		if (k ~ /^#[^#]/) {
 			if (!(substr(k, 2) in last_occ)) {
 				last_occ[substr(k, 2)] = last_occ[k]
 			}
