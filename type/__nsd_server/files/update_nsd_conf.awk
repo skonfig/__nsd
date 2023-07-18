@@ -140,11 +140,12 @@ BEGIN {
 	# Read the "diff" into the `conf_{set,unset}` arrays
 	split("", conf_set)
 	split("", conf_unset)
-	while (getline < "/dev/stdin") {
+	while (0 < ("cat" | getline)) {
 		if (empty_line($0)) continue  # ignore empty lines
 		if (proc_diff_line($0, conf_set, conf_unset))
 			exit (e=1)
 	}
+	close("cat")
 }
 
 
