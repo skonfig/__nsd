@@ -29,7 +29,7 @@ else
 fi
 
 # Install post-processing
-if ${fresh_install?}
+if ${fresh_install?} || test ! -s "${__object:?}/explorer/options"
 then
 	# OS-specific processing
 	read -r os <"${__global:?}/explorer/os"
@@ -59,11 +59,6 @@ then
 			;;
 	esac
 
-	# Run `nsd-control-setup` after install to generate a key pair for
-	# nsd-control. Even if remote control is disabled, having the key pair does
-	# not hurt.
-	echo 'nsd-control-setup'
-
 	# Config post-processing
 	# Ensure that *.conf files from nsd.conf.d are included; ensure only *.conf
 	# are included because this set installs .tmp files into conf.d, i.e.
@@ -91,6 +86,14 @@ c \\
 ${include_line_should}
 ' $(shquot "${nsd_conf}")
 EOF
+fi
+
+if ${fresh_install?}
+then
+	# Run `nsd-control-setup` after install to generate a key pair for
+	# nsd-control. Even if remote control is disabled, having the key pair does
+	# not hurt.
+	echo 'nsd-control-setup'
 fi
 
 if test -s "${__object:?}/parameter/zonesdir"
