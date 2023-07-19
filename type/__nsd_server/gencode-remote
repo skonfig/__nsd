@@ -46,14 +46,23 @@ then
 		(debian|devuan)
 			# Debian does not install a proper config file in /etc/nsd/nsd.conf,
 			# so we copy the example.
-			cat <<-'EOF'
+			cat <<-EOF
 			if test -r /usr/share/doc/nsd/examples/nsd.conf.gz
 			then
-			    zcat /usr/share/doc/nsd/examples/nsd.conf.gz >/etc/nsd/nsd.conf
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.gz >$(shquot "${nsd_conf}")
 			elif test -r /usr/share/doc/nsd/examples/nsd.conf.sample.gz
 			then
-			    zcat /usr/share/doc/nsd/examples/nsd.conf.sample.gz >/etc/nsd/nsd.conf
+			    zcat /usr/share/doc/nsd/examples/nsd.conf.sample.gz >$(shquot "${nsd_conf}")
+			elif test -r /usr/share/doc/nsd/examples/nsd.conf.sample
+			then
+			    cat /usr/share/doc/nsd/examples/nsd.conf.sample >$(shquot "${nsd_conf}")
 			fi
+
+			test -s $(shquot "${nsd_conf}") || {
+			    echo 'failed to create nsd.conf from template' >&2
+			    exit 1
+			}
+
 			EOF
 			;;
 	esac
