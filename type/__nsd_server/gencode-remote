@@ -28,8 +28,6 @@ drop_awk_comments() { shquot "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
 CONF_BASE_PATH=/etc/nsd
 nsd_conf="${CONF_BASE_PATH}/nsd.conf"
 
-os=$(cat "${__global:?}/explorer/os")
-
 if grep -q '^__package[_a-z]*/nsd[0-9]*:installed' "${__messages_in:?}"
 then
 	fresh_install=true
@@ -38,9 +36,10 @@ else
 fi
 
 # Install post-processing
-if ${fresh_install}
+if ${fresh_install?}
 then
 	# OS-specific processing
+	read -r os <"${__global:?}/explorer/os"
 	case ${os}
 	in
 		(debian|devuan)
@@ -204,12 +203,13 @@ CODE
 	echo 'config updated' >>"${__messages_out:?}"
 fi
 
-if ${fresh_install} || ${config_updated:-false}
+if ${fresh_install?} || ${config_updated:-false}
 then
 	# NOTE: The nsd service needs to be restarted after running
 	#       nsd-control-setup if it is running to make nsd-control work.
 	# NOTE: We try to restart NSD only if it has been running before.
-	case $(cat "${__global:?}/explorer/init")
+	read -r init <"${__global:?}/explorer/init"
+	case ${init}
 	in
 		(systemd)
 			echo 'systemctl try-restart nsd.service'
@@ -228,5 +228,6 @@ then
 		(*)
 			echo "Don't know how to restart service with your init. "\
 			     "Restart nsd service manually to make nsd-control work." >&2
+			;;
 	esac
 fi

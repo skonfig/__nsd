@@ -42,9 +42,10 @@ __package "${package_name}" --state "${state_should}"
 __start_on_boot nsd
 unset CDIST_ORDER_DEPENDENCY
 
-require=__package/"${package_name}" \
-__directory "${CONF_BASE_DIR}" --state pre-exists
+require="__package/${package_name}" \
+__directory "${CONF_BASE_DIR}" \
+	--state pre-exists
 
-require=__directory/"${CONF_BASE_DIR}" \
-__directory "${CONF_BASE_DIR}/nsd.conf.d" --state present \
+require="__directory${CONF_BASE_DIR}" \
+__directory "${CONF_BASE_DIR}/nsd.conf.d" \
 	--owner 0 --group 0 --mode 0755
