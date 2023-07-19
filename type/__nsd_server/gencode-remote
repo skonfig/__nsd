@@ -65,11 +65,32 @@ then
 	echo 'nsd-control-setup'
 
 	# Config post-processing
-	# Ensure that *.conf files from nsd.conf.d are included
-	cat <<-'EOF'
-	grep -q '^include: "/etc/nsd/nsd\.conf\.d/\*\(\.conf\)\{,1\}?"' '${nsd_conf}' \
-	|| printf '\ninclude: "/etc/nsd/nsd.conf.d/*.conf"\n' >>'${nsd_conf}'
-	EOF
+	# Ensure that *.conf files from nsd.conf.d are included; ensure only *.conf
+	# are included because this set installs .tmp files into conf.d, i.e.
+	# replace "include nsd.conf.d/*" lines.
+	include_glob_should="${CONF_BASE_PATH}/nsd.conf.d/*.conf"
+	include_line_should="include: \"${include_glob_should}\""
+	cat <<EOF
+grep -qxF $(shquot "${include_line_should}") $(shquot "${nsd_conf}") \
+|| sed -i -e '
+/^include: "$(breify "${include_glob_should%/}/")[^"]*"/{
+h
+b repl
+}
+\${
+x
+s/^\$//
+x
+t appd
+}
+b
+:appd
+p
+:repl
+c \\
+${include_line_should}
+' $(shquot "${nsd_conf}")
+EOF
 fi
 
 if test -s "${__object:?}/parameter/zonesdir"
