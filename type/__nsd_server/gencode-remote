@@ -96,8 +96,13 @@ diff=$(
 	}
 	get_param() { head -n 1 "${__object:?}/parameter/${1:?}"; }
 	bool_value() {
-		test "$(case $1 in (no-*) echo '!';; esac)" -f "${__object:?}/parameter/${1:?}" \
-			&& echo yes || echo no
+		# shellcheck disable=SC2046  # do not quote the case, it would produce an empty argument for regular options
+		if test $(case $1 in (no-*) echo '!' ;; esac) -f "${__object:?}/parameter/${1:?}"
+		then
+			echo yes
+		else
+			echo no
+		fi
 	}
 
 	{
