@@ -1,6 +1,5 @@
-#!/bin/sh -e
 #
-# 2020,2023 Dennis Camera (dennis.camera at riiengineering.ch)
+# 2023 Dennis Camera (dennis.camera at riiengineering.ch)
 #
 # This file is part of the skonfig set __nsd.
 #
@@ -18,19 +17,18 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-state_should=$(cat "${__object:?}/parameter/state")
+breify() {
+	sed -e 's:[].^$*/\[]:\\&:g' <<-EOF
+	$*
+	EOF
+}
 
-. "${__type:?}/files/common.sh"
+shquot() {
+	sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/" <<-EOF
+	$*
+	EOF
+}
 
-export CDIST_ORDER_DEPENDENCY=true
-__package "${package_name}" --state "${state_should}"
-__start_on_boot nsd
-unset CDIST_ORDER_DEPENDENCY
-
-require="__package/${package_name}" \
-__directory "${CONF_BASE_DIR}" \
-	--state pre-exists
-
-require="__directory${CONF_BASE_DIR}" \
-__directory "${CONF_BASE_DIR}/nsd.conf.d" \
-	--owner 0 --group 0 --mode 0755
+drop_awk_comments() {
+	shquot "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"
+}

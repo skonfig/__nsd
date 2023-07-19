@@ -18,17 +18,10 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-shquot() {
-	sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/" <<-EOF
-	$*
-	EOF
-}
-drop_awk_comments() { shquot "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
+. "${__type:?}/files/common.sh"
+. "${__type:?}/files/functions.sh"
 
-CONF_BASE_PATH=/etc/nsd
-nsd_conf="${CONF_BASE_PATH}/nsd.conf"
-
-if grep -q '^__package[_a-z]*/nsd[0-9]*:installed' "${__messages_in:?}"
+if grep -q "^__package[_a-z]*/$(breify "${package_name:?}"):installed" "${__messages_in:?}"
 then
 	fresh_install=true
 else

@@ -1,6 +1,5 @@
-#!/bin/sh -e
 #
-# 2020,2023 Dennis Camera (dennis.camera at riiengineering.ch)
+# 2023 Dennis Camera (dennis.camera at riiengineering.ch)
 #
 # This file is part of the skonfig set __nsd.
 #
@@ -18,19 +17,20 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-state_should=$(cat "${__object:?}/parameter/state")
+CONF_BASE_DIR='/etc/nsd'
+nsd_conf="${CONF_BASE_DIR}/nsd.conf"
 
-. "${__type:?}/files/common.sh"
+os=$(cat "${__global:?}/explorer/os")
 
-export CDIST_ORDER_DEPENDENCY=true
-__package "${package_name}" --state "${state_should}"
-__start_on_boot nsd
-unset CDIST_ORDER_DEPENDENCY
-
-require="__package/${package_name}" \
-__directory "${CONF_BASE_DIR}" \
-	--state pre-exists
-
-require="__directory${CONF_BASE_DIR}" \
-__directory "${CONF_BASE_DIR}/nsd.conf.d" \
-	--owner 0 --group 0 --mode 0755
+case ${os}
+in
+	(debian|devuan)
+		package_name=nsd
+		;;
+	(*)
+		: "${__type:?}"  # make shellcheck happy
+		printf "Your operating system (%s) is currently not supported by this type (%s)\n" "${os}" "${__type##*/}" >&2
+		printf "Please contribute an implementation for it if you can.\n" >&2
+		exit 1
+		;;
+esac
