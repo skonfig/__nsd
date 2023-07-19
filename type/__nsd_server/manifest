@@ -18,19 +18,29 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-state_should=$(cat "${__object:?}/parameter/state")
+read -r state_should <"${__object:?}/parameter/state"
 
 . "${__type:?}/files/common.sh"
 
-export CDIST_ORDER_DEPENDENCY=true
-__package "${package_name}" --state "${state_should}"
-__start_on_boot nsd
-unset CDIST_ORDER_DEPENDENCY
 
-require="__package/${package_name}" \
-__directory "${CONF_BASE_DIR}" \
-	--state pre-exists
+__package nsd \
+	--name "${package_name}" \
+	--state "${state_should}"
 
-require="__directory${CONF_BASE_DIR}" \
-__directory "${CONF_BASE_DIR}/nsd.conf.d" \
-	--owner 0 --group 0 --mode 0755
+case ${state_should}
+in
+	(present)
+		require=__package/nsd \
+		__start_on_boot nsd
+
+		require=__package/nsd \
+		__directory "${CONF_BASE_DIR:?}" \
+			--state pre-exists
+
+		require="__directory${CONF_BASE_DIR:?}" \
+		__directory "${CONF_BASE_DIR:?}/nsd.conf.d" \
+			--owner 0 --group 0 --mode 0755
+		;;
+	(absent)
+		;;
+esac
