@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# 2020 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+# 2020,2023 Dennis Camera (dennis.camera at riiengineering.ch)
 #
 # This file is part of the skonfig set __nsd.
 #
@@ -18,8 +18,12 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-drop_awk_comments() { quote "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
-quote() { printf "'%s'" "$(printf '%s' "$*" | sed -e "s/'/'\\\\''/g")"; }
+shquot() {
+	sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/" <<-EOF
+	$*
+	EOF
+}
+drop_awk_comments() { shquot "$(sed '/^[[:blank:]]*#.*$/d;/^$/d' "$@")"; }
 
 CONF_BASE_PATH=/etc/nsd
 nsd_conf="${CONF_BASE_PATH}/nsd.conf"
@@ -70,7 +74,7 @@ fi
 if test -s "${__object:?}/parameter/zonesdir"
 then
 	printf "test -d %s || { echo \"%s\" >&2; exit 1; }\n" \
-		"$(quote "$(head -n 1 "${__object:?}/parameter/zonesdir")")" \
+		"$(shquot "$(head -n 1 "${__object:?}/parameter/zonesdir")")" \
 		'zonesdir does not exist on the target!'
 fi
 
@@ -175,11 +179,11 @@ diff=$(
 if test -n "${diff}"
 then
 	cat <<CODE
-awk $(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk") $(quote "${nsd_conf}") <<'EOF' >$(quote "${nsd_conf}.tmp") \
-&& nsd-checkconf $(quote "${nsd_conf}.tmp") && cat $(quote "${nsd_conf}.tmp") >$(quote "${nsd_conf}") || exit 1
+awk $(drop_awk_comments "${__type:?}/files/update_nsd_conf.awk") $(shquot "${nsd_conf}") <<'EOF' >$(shquot "${nsd_conf}.tmp") \
+&& nsd-checkconf $(shquot "${nsd_conf}.tmp") && cat $(shquot "${nsd_conf}.tmp") >$(shquot "${nsd_conf}") || exit 1
 ${diff}
 EOF
-rm -f $(quote "${nsd_conf}.tmp")
+rm -f $(shquot "${nsd_conf}.tmp")
 CODE
 
 	config_updated=true

@@ -1,6 +1,6 @@
 #!/bin/sh -e
 #
-# 2020 Dennis Camera (dennis.camera at ssrq-sds-fds.ch)
+# 2020,2023 Dennis Camera (dennis.camera at riiengineering.ch)
 #
 # This file is part of the skonfig set __nsd.
 #
@@ -18,7 +18,11 @@
 # along with this set. If not, see <http://www.gnu.org/licenses/>.
 #
 
-quote() { printf "'%s'" "$(echo "$*" | sed -e "s/'/'\\\\''/g")"; }
+shquot() {
+	sed -e "s/'/'\\\\''/g" -e "1s/^/'/" -e "\$s/\$/'/" <<-EOF
+	$*
+	EOF
+}
 
 zone_name=${__object_id:?}
 
@@ -39,18 +43,16 @@ in
 		if test "${state_is}" = absent
 		then
 			printf "nsd-control addzone %s %s || exit 1\n" \
-				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
+				"$(shquot "${zone_name}")" "$(shquot "${pattern_should}")"
 		elif test "${pattern_is}" != "${pattern_should}"
 		then
 			printf "nsd-control changezone %s %s || exit 1\n" \
-				"$(quote "${zone_name}")" "$(quote "${pattern_should}")"
+				"$(shquot "${zone_name}")" "$(shquot "${pattern_should}")"
 		fi
 		;;
-
 	(absent)
-		printf "nsd-control delzone %s\n || exit 1" "$(quote "${zone_name}")"
+		printf "nsd-control delzone %s\n || exit 1" "$(shquot "${zone_name}")"
 		;;
-
 	(*)
 		printf 'Invalid --state: %s\n' "${state_should}" >&2
 		exit 1
