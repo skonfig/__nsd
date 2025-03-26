@@ -51,7 +51,7 @@ in
 		fi
 		;;
 	(absent)
-		printf "nsd-control delzone %s\n || exit 1" "$(shquot "${zone_name}")"
+		printf 'nsd-control delzone %s || exit 1\n' "$(shquot "${zone_name}")"
 		;;
 	(*)
 		printf 'Invalid --state: %s\n' "${state_should}" >&2
