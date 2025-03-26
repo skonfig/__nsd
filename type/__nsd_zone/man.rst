@@ -22,7 +22,7 @@ pattern
 
    The given pattern must already exist when this object is executed.
 source
-   Copy this zonefile from the host running cdist to the target.
+   Copy this zonefile from the host running skonfig to the target.
    If source is ``-`` (dash), the contents of stdin are used.
 
    If not supplied, no zonefile will be created (for slave zones).
