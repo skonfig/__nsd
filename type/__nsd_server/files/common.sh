@@ -1,3 +1,4 @@
+# shellcheck disable=SC2034
 #
 # 2023 Dennis Camera (dennis.camera at riiengineering.ch)
 #
